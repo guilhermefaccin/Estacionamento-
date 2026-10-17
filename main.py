@@ -1,0 +1,134 @@
+
+from fastapi import FastAPI, Depends, HTTPException
+from sqlmodel import Session
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+
+from banco.sessao import obter_sessao
+from schemas.usuario import (
+    UsuarioCriar,
+    UsuarioResposta,
+    UsuarioAtualizar,
+)
+from servicos.usuario import (
+    cadastrar_usuario,
+    listar_usuarios,
+    buscar_usuario_por_id,
+    atualizar_usuario,
+    desativar_usuario,
+)
+
+
+app = FastAPI(
+    title="Sistema de Estacionamento",
+    description="API para gerenciamento de estacionamento horista e mensalista.",
+    version="1.0.0",
+)
+
+
+@app.get("/")
+def inicio():
+    return {
+        "mensagem": "API do Sistema de Estacionamento funcionando!"
+    }
+
+
+@app.get("/status")
+def status():
+    return {
+        "status": "online"
+    }
+
+
+
+@app.post("/usuarios", response_model=UsuarioResposta, status_code=201)
+def criar_usuario(
+    dados: UsuarioCriar,
+    db: Session = Depends(obter_sessao),
+):
+    try:
+        return cadastrar_usuario(dados, db)
+
+    except IntegrityError as e:
+        db.rollback()
+        print(f"Erro de integridade ao cadastrar usuario: {e}")
+        raise HTTPException(
+            status_code=409,
+            detail="Conflito de integridade no banco de dados. Verifique o terminal.",
+        )
+
+    except SQLAlchemyError as e:
+        db.rollback()
+        print(f"Erro de banco de dados: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="Erro ao cadastrar usuario no banco de dados.",
+        )
+@app.get("/usuarios", response_model=list[UsuarioResposta])
+def obter_usuarios(
+    db: Session = Depends(obter_sessao),
+):
+    return listar_usuarios(db)
+
+@app.get("/usuarios/{id_usuario}", response_model=UsuarioResposta)
+def obter_usuario(
+    id_usuario: int,
+    db: Session = Depends(obter_sessao),
+):
+    usuario = buscar_usuario_por_id(id_usuario, db)
+
+    if usuario is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Usuário não encontrado.",
+        )   
+
+    return usuario
+
+@app.put("/usuarios/{id_usuario}", response_model=UsuarioResposta)
+def editar_usuario(
+    id_usuario: int,
+    dados: UsuarioAtualizar,
+    db: Session = Depends(obter_sessao),
+):
+    try:
+        usuario = atualizar_usuario(id_usuario, dados, db)
+
+        if usuario is None:
+            raise HTTPException(
+                status_code=404,
+                detail="Usuário não encontrado.",
+            )
+
+        return usuario
+
+    except IntegrityError as e:
+        db.rollback()
+        print(f"Erro de integridade ao atualizar usuario: {e}")
+        raise HTTPException(
+            status_code=409,
+            detail="CPF já cadastrado ou conflito de integridade.",
+        )
+
+    except SQLAlchemyError as e:
+        db.rollback()
+        print(f"Erro de banco de dados ao atualizar usuario: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="Erro ao atualizar usuario no banco de dados.",
+        )
+
+
+@app.patch("/usuarios/{id_usuario}/desativar", response_model=UsuarioResposta)
+def rota_desativar_usuario(
+    id_usuario: int,
+    db: Session = Depends(obter_sessao),
+):
+    usuario = desativar_usuario(id_usuario, db)
+
+    if usuario is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Usuário não encontrado.",
+        )
+
+    return usuario
