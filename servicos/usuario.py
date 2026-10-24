@@ -1,6 +1,6 @@
 
 from sqlmodel import Session, select
-from entidades.usuario import Usuario
+from entidades.models import Usuario
 from schemas.usuario import UsuarioCriar, UsuarioAtualizar
 
 
@@ -55,6 +55,7 @@ def atualizar_usuario(
     return usuario
 
 
+
 def desativar_usuario(
     id_usuario: int,
     db: Session
@@ -68,5 +69,6 @@ def desativar_usuario(
 
     db.add(usuario)
     db.commit()
+    db.refresh(usuario)
 
     return usuario

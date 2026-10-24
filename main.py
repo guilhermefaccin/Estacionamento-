@@ -2,8 +2,10 @@
 from fastapi import FastAPI, Depends, HTTPException
 from sqlmodel import Session
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
-
+from pathlib import Path
+from fastapi.responses import FileResponse
 from banco.sessao import obter_sessao
+from rotas.vagas import router as vagas_router
 from schemas.usuario import (
     UsuarioCriar,
     UsuarioResposta,
@@ -16,7 +18,13 @@ from servicos.usuario import (
     atualizar_usuario,
     desativar_usuario,
 )
-
+from entidades import models
+from rotas.clientes import router as clientes_router
+from rotas.veiculos import router as veiculos_router
+from rotas.marcas import router as marcas_router
+from rotas.tarifas import router as tarifas_router
+from rotas.contratos_mensais import router as contratos_mensais_router
+from rotas.estacionamentos import router as estacionamentos_router
 
 app = FastAPI(
     title="Sistema de Estacionamento",
@@ -24,6 +32,20 @@ app = FastAPI(
     version="1.0.0",
 )
 
+app.include_router(clientes_router)
+app.include_router(veiculos_router)
+app.include_router(marcas_router)
+app.include_router(vagas_router)
+app.include_router(tarifas_router)
+app.include_router(contratos_mensais_router)
+app.include_router(estacionamentos_router)
+
+BASE_DIR = Path(__file__).resolve().parent
+
+
+@app.get("/app", include_in_schema=False)
+def pagina_inicial():
+    return FileResponse(BASE_DIR / "frontend" / "index.html")
 
 @app.get("/")
 def inicio():

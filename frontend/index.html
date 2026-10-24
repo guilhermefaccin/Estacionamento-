@@ -1,0 +1,418 @@
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Estacionamento</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f1f5f9;
+            color: #1e293b;
+        }
+
+        header {
+            background: #12304a;
+            color: white;
+            padding: 24px;
+        }
+
+        header h1 {
+            margin: 0 0 8px;
+        }
+
+        header p {
+            margin: 0;
+            color: #dbeafe;
+        }
+
+        main {
+            max-width: 1100px;
+            margin: 30px auto;
+            padding: 0 20px;
+        }
+
+        .card {
+            background: white;
+            padding: 24px;
+            margin-bottom: 24px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px #0000000d;
+        }
+
+        h2 {
+            margin-top: 0;
+        }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: bold;
+        }
+
+        input {
+            width: 100%;
+            padding: 11px;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+        }
+
+        button {
+            padding: 10px 14px;
+            border: 0;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 4px 4px 4px 0;
+        }
+
+        .primary {
+            background: #176b45;
+            color: white;
+        }
+
+        .secondary {
+            background: #e2e8f0;
+            color: #1e293b;
+        }
+
+        .edit {
+            background: #dbeafe;
+            color: #1d4ed8;
+        }
+
+        .deactivate {
+            background: #fee2e2;
+            color: #b91c1c;
+        }
+
+        .actions {
+            margin-top: 18px;
+        }
+
+        #mensagem {
+            margin-top: 15px;
+            font-weight: bold;
+        }
+
+        .table-container {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 650px;
+        }
+
+        th, td {
+            padding: 12px;
+            border-bottom: 1px solid #e2e8f0;
+            text-align: left;
+        }
+
+        th {
+            background: #f8fafc;
+        }
+
+        @media (max-width: 700px) {
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+
+            main {
+                margin-top: 18px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <h1>Sistema de Estacionamento</h1>
+        <p>Gerenciamento de usuários</p>
+    </header>
+
+    <main>
+        <section class="card">
+            <h2 id="titulo-formulario">Cadastrar usuário</h2>
+
+            <form id="form-usuario">
+                <div class="form-grid">
+                    <div>
+                        <label for="nome">Nome</label>
+                        <input id="nome" type="text"
+                               maxlength="100" required>
+                    </div>
+
+                    <div>
+                        <label for="cpf">CPF (11 dígitos)</label>
+                        <input id="cpf" type="text"
+                               inputmode="numeric"
+                               maxlength="11"
+                               pattern="[0-9]{11}" required>
+                    </div>
+
+                    <div>
+                        <label for="email">E-mail</label>
+                        <input id="email" type="email"
+                               maxlength="80" required>
+                    </div>
+                </div>
+
+                <div class="actions">
+                    <button class="primary" type="submit">
+                        Salvar usuário
+                    </button>
+
+                    <button class="secondary" type="button"
+                            id="cancelar" hidden>
+                        Cancelar edição
+                    </button>
+                </div>
+            </form>
+
+            <p id="mensagem" role="status"></p>
+        </section>
+
+        <section class="card">
+            <h2>Usuários cadastrados</h2>
+
+            <button class="secondary" id="atualizar-lista" type="button">
+                Atualizar lista
+            </button>
+
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Nome</th>
+                            <th>CPF</th>
+                            <th>E-mail</th>
+                            <th>Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="lista-usuarios">
+                        <tr>
+                            <td colspan="5">Carregando usuários...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        const API = "/usuarios";
+
+        const formulario = document.getElementById("form-usuario");
+        const campoNome = document.getElementById("nome");
+        const campoCpf = document.getElementById("cpf");
+        const campoEmail = document.getElementById("email");
+        const mensagem = document.getElementById("mensagem");
+        const lista = document.getElementById("lista-usuarios");
+        const cancelar = document.getElementById("cancelar");
+        const titulo = document.getElementById("titulo-formulario");
+
+        let idEmEdicao = null;
+
+        function mostrarMensagem(texto, erro = false) {
+            mensagem.textContent = texto;
+            mensagem.style.color = erro ? "#b91c1c" : "#176b45";
+        }
+
+        async function requisicao(url, opcoes = {}) {
+            const resposta = await fetch(url, {
+                ...opcoes,
+                headers: {
+                    "Content-Type": "application/json",
+                    ...(opcoes.headers || {})
+                }
+            });
+
+            if (!resposta.ok) {
+                let detalhe = "Erro ao executar a operação.";
+
+                try {
+                    const dados = await resposta.json();
+                    detalhe = typeof dados.detail === "string"
+                        ? dados.detail
+                        : JSON.stringify(dados.detail || dados);
+                } catch (_) {}
+
+                throw new Error(detalhe);
+            }
+
+            if (resposta.status === 204) {
+                return null;
+            }
+
+            return resposta.json();
+        }
+
+        async function carregarUsuarios() {
+            lista.replaceChildren();
+
+            const carregando = document.createElement("tr");
+            const celula = document.createElement("td");
+            celula.colSpan = 5;
+            celula.textContent = "Carregando...";
+            carregando.appendChild(celula);
+            lista.appendChild(carregando);
+
+            try {
+                const usuarios = await requisicao(API);
+                lista.replaceChildren();
+
+                if (usuarios.length === 0) {
+                    const linha = document.createElement("tr");
+                    const coluna = document.createElement("td");
+                    coluna.colSpan = 5;
+                    coluna.textContent = "Nenhum usuário cadastrado.";
+                    linha.appendChild(coluna);
+                    lista.appendChild(linha);
+                    return;
+                }
+
+                usuarios.forEach(usuario => {
+                    const linha = document.createElement("tr");
+
+                    [
+                        usuario.id_usuario,
+                        usuario.nome,
+                        usuario.cpf,
+                        usuario.email
+                    ].forEach(valor => {
+                        const coluna = document.createElement("td");
+                        coluna.textContent = valor ?? "";
+                        linha.appendChild(coluna);
+                    });
+
+                    const acoes = document.createElement("td");
+
+                    const botaoEditar = document.createElement("button");
+                    botaoEditar.textContent = "Editar";
+                    botaoEditar.className = "edit";
+                    botaoEditar.addEventListener("click", () => {
+                        iniciarEdicao(usuario);
+                    });
+
+                    const botaoDesativar = document.createElement("button");
+                    botaoDesativar.textContent = "Desativar";
+                    botaoDesativar.className = "deactivate";
+                    botaoDesativar.addEventListener("click", () => {
+                        desativarUsuario(usuario.id_usuario);
+                    });
+
+                    acoes.append(botaoEditar, botaoDesativar);
+                    linha.appendChild(acoes);
+                    lista.appendChild(linha);
+                });
+            } catch (erro) {
+                lista.replaceChildren();
+                const linha = document.createElement("tr");
+                const coluna = document.createElement("td");
+                coluna.colSpan = 5;
+                coluna.textContent = "Não foi possível carregar: " + erro.message;
+                linha.appendChild(coluna);
+                lista.appendChild(linha);
+            }
+        }
+
+        function iniciarEdicao(usuario) {
+            idEmEdicao = usuario.id_usuario;
+            campoNome.value = usuario.nome;
+            campoCpf.value = usuario.cpf;
+            campoEmail.value = usuario.email;
+
+            titulo.textContent = "Editar usuário #" + usuario.id_usuario;
+            cancelar.hidden = false;
+            campoNome.focus();
+            mostrarMensagem("Editando usuário #" + usuario.id_usuario);
+        }
+
+        function limparFormulario() {
+            formulario.reset();
+            idEmEdicao = null;
+            titulo.textContent = "Cadastrar usuário";
+            cancelar.hidden = true;
+        }
+
+        formulario.addEventListener("submit", async evento => {
+            evento.preventDefault();
+
+            const dados = {
+                nome: campoNome.value.trim(),
+                cpf: campoCpf.value.trim(),
+                email: campoEmail.value.trim()
+            };
+
+            try {
+                if (idEmEdicao === null) {
+                    await requisicao(API, {
+                        method: "POST",
+                        body: JSON.stringify(dados)
+                    });
+                    mostrarMensagem("Usuário cadastrado com sucesso!");
+                } else {
+                    await requisicao(`${API}/${idEmEdicao}`, {
+                        method: "PUT",
+                        body: JSON.stringify(dados)
+                    });
+                    mostrarMensagem("Usuário atualizado com sucesso!");
+                }
+
+                limparFormulario();
+                await carregarUsuarios();
+            } catch (erro) {
+                mostrarMensagem(erro.message, true);
+            }
+        });
+
+        async function desativarUsuario(id) {
+            if (!confirm("Deseja realmente desativar o usuário #" + id + "?")) {
+                return;
+            }
+
+            try {
+                await requisicao(`${API}/${id}/desativar`, {
+                    method: "PATCH"
+                });
+
+                if (idEmEdicao === id) {
+                    limparFormulario();
+                }
+
+                mostrarMensagem("Usuário desativado com sucesso!");
+                await carregarUsuarios();
+            } catch (erro) {
+                mostrarMensagem(erro.message, true);
+            }
+        }
+
+        cancelar.addEventListener("click", () => {
+            limparFormulario();
+            mostrarMensagem("Edição cancelada.");
+        });
+
+        document.getElementById("atualizar-lista")
+            .addEventListener("click", carregarUsuarios);
+
+        carregarUsuarios();
+    </script>
+</body>
+</html>
