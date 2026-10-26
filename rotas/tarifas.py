@@ -2,7 +2,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel import Session
 from banco.sessao import obter_sessao
-from banco.sessao import obter_sessao
 from schemas.tarifas import (
     TarifaCriar,
     TarifaAtualizar,
@@ -62,6 +61,7 @@ def atualizar(
     return atualizar_tarifa(db, tarifa, dados)
 
 
+
 @router.patch("/{id_tarifa}/desativar", response_model=TarifaResposta)
 def desativar(id_tarifa: int, db: Session = Depends(obter_sessao)):
     tarifa = buscar_tarifa_por_id(db, id_tarifa)
@@ -71,5 +71,16 @@ def desativar(id_tarifa: int, db: Session = Depends(obter_sessao)):
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Tarifa não encontrada ou inativa"
         )
+
+    tarifa_desativada = desativar_tarifa(db, tarifa)
+
+    if tarifa_desativada is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Não foi possível desativar a tarifa"
+        )
+
+    return tarifa_desativada
+
 
     db: Session = Depends(obter_sessao)

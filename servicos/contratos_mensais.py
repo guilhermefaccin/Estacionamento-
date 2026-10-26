@@ -4,11 +4,37 @@ from sqlmodel import Session, select
 from entidades.models import (
     ContratoMensal,
     StatusContrato,
+    Vaga,
+    StatusVaga,
 )
 from schemas.contratos_mensais import (
     ContratoMensalCriar,
     ContratoMensalAtualizar,
 )
+
+
+def sincronizar_status_vaga(db: Session, id_vaga: int | None) -> None:
+    if id_vaga is None:
+        return
+
+    vaga = db.get(Vaga, id_vaga)
+
+    if vaga is None or not vaga.ativo:
+        return
+
+    contrato_ativo = db.exec(
+        select(ContratoMensal).where(
+            ContratoMensal.id_vaga == id_vaga,
+            ContratoMensal.status == StatusContrato.ATIVO,
+        )
+    ).first()
+
+    if contrato_ativo:
+        vaga.status = StatusVaga.OCUPADA
+    elif vaga.status != StatusVaga.BLOQUEADA:
+        vaga.status = StatusVaga.LIVRE
+
+    db.add(vaga)
 
 
 def cadastrar_contrato(
@@ -23,6 +49,11 @@ def cadastrar_contrato(
     contrato.id_usuario_alteracao = id_usuario
 
     db.add(contrato)
+    db.flush()
+
+    if contrato.status == StatusContrato.ATIVO:
+        sincronizar_status_vaga(db, contrato.id_vaga)
+
     db.commit()
     db.refresh(contrato)
 
@@ -55,6 +86,7 @@ def atualizar_contrato(
     dados: ContratoMensalAtualizar,
     id_usuario: int,
 ) -> ContratoMensal:
+    vaga_anterior = contrato.id_vaga
     alteracoes = dados.model_dump(exclude_unset=True)
 
     for campo, valor in alteracoes.items():
@@ -63,6 +95,11 @@ def atualizar_contrato(
     contrato.id_usuario_alteracao = id_usuario
 
     db.add(contrato)
+    db.flush()
+
+    sincronizar_status_vaga(db, vaga_anterior)
+    sincronizar_status_vaga(db, contrato.id_vaga)
+
     db.commit()
     db.refresh(contrato)
 
@@ -74,10 +111,16 @@ def desativar_contrato(
     contrato: ContratoMensal,
     id_usuario: int,
 ) -> ContratoMensal:
+    id_vaga = contrato.id_vaga
+
     contrato.status = StatusContrato.ENCERRADO
     contrato.id_usuario_alteracao = id_usuario
 
     db.add(contrato)
+    db.flush()
+
+    sincronizar_status_vaga(db, id_vaga)
+
     db.commit()
     db.refresh(contrato)
 

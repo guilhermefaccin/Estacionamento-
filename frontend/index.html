@@ -1,418 +1,174 @@
-
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sistema de Estacionamento</title>
-
-    <style>
-        * {
-            box-sizing: border-box;
-        }
-
-        body {
-            margin: 0;
-            font-family: Arial, sans-serif;
-            background: #f1f5f9;
-            color: #1e293b;
-        }
-
-        header {
-            background: #12304a;
-            color: white;
-            padding: 24px;
-        }
-
-        header h1 {
-            margin: 0 0 8px;
-        }
-
-        header p {
-            margin: 0;
-            color: #dbeafe;
-        }
-
-        main {
-            max-width: 1100px;
-            margin: 30px auto;
-            padding: 0 20px;
-        }
-
-        .card {
-            background: white;
-            padding: 24px;
-            margin-bottom: 24px;
-            border-radius: 10px;
-            box-shadow: 0 2px 8px #0000000d;
-        }
-
-        h2 {
-            margin-top: 0;
-        }
-
-        .form-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 16px;
-        }
-
-        label {
-            display: block;
-            margin-bottom: 6px;
-            font-weight: bold;
-        }
-
-        input {
-            width: 100%;
-            padding: 11px;
-            border: 1px solid #cbd5e1;
-            border-radius: 6px;
-        }
-
-        button {
-            padding: 10px 14px;
-            border: 0;
-            border-radius: 6px;
-            cursor: pointer;
-            font-weight: bold;
-            margin: 4px 4px 4px 0;
-        }
-
-        .primary {
-            background: #176b45;
-            color: white;
-        }
-
-        .secondary {
-            background: #e2e8f0;
-            color: #1e293b;
-        }
-
-        .edit {
-            background: #dbeafe;
-            color: #1d4ed8;
-        }
-
-        .deactivate {
-            background: #fee2e2;
-            color: #b91c1c;
-        }
-
-        .actions {
-            margin-top: 18px;
-        }
-
-        #mensagem {
-            margin-top: 15px;
-            font-weight: bold;
-        }
-
-        .table-container {
-            overflow-x: auto;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            min-width: 650px;
-        }
-
-        th, td {
-            padding: 12px;
-            border-bottom: 1px solid #e2e8f0;
-            text-align: left;
-        }
-
-        th {
-            background: #f8fafc;
-        }
-
-        @media (max-width: 700px) {
-            .form-grid {
-                grid-template-columns: 1fr;
-            }
-
-            main {
-                margin-top: 18px;
-            }
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sistema de Estacionamento</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="app.js" defer></script>
 </head>
-
 <body>
-    <header>
-        <h1>Sistema de Estacionamento</h1>
-        <p>Gerenciamento de usuários</p>
+  <aside class="sidebar">
+    <div class="brand"><span class="brand-icon">P</span><div><strong>ParkControl</strong><small>Gestão de estacionamento</small></div></div>
+    <nav id="menu">
+      <button class="nav-link active" data-page="inicio">⌂ <span>Visão geral</span></button>
+      <p class="nav-label">OPERAÇÃO</p>
+      <button class="nav-link" data-page="estacionamentos">↔ <span>Entrada e saída</span></button>
+      <button class="nav-link" data-page="vagas">▦ <span>Vagas</span></button>
+      <p class="nav-label">CADASTROS</p>
+      <button class="nav-link" data-page="usuarios">♙ <span>Usuários</span></button>
+      <button class="nav-link" data-page="clientes">♧ <span>Clientes</span></button>
+      <button class="nav-link" data-page="veiculos">▣ <span>Veículos</span></button>
+      <button class="nav-link" data-page="marcas">◈ <span>Marcas</span></button>
+      <button class="nav-link" data-page="tarifas">＄ <span>Tarifas</span></button>
+      <button class="nav-link" data-page="contratos">▤ <span>Contratos mensais</span></button>
+    </nav>
+    <div class="sidebar-footer"><span class="status-dot"></span> API local <small id="api-status">verificando...</small></div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div><p class="eyebrow">PAINEL ADMINISTRATIVO</p><h1 id="page-title">Visão geral</h1></div>
+      <div class="topbar-right"><span class="today" id="today"></span><span class="avatar">GC</span></div>
     </header>
 
-    <main>
-        <section class="card">
-            <h2 id="titulo-formulario">Cadastrar usuário</h2>
+    <div id="alerta" class="alert" role="status" hidden></div>
 
-            <form id="form-usuario">
-                <div class="form-grid">
-                    <div>
-                        <label for="nome">Nome</label>
-                        <input id="nome" type="text"
-                               maxlength="100" required>
-                    </div>
+    <section class="page active" id="page-inicio">
+      <div class="welcome"><div><p class="eyebrow light">BEM-VINDO AO PAINEL</p><h2>Controle seu estacionamento<br>em um só lugar.</h2><p>Cadastros e operação diária em uma interface única.</p></div><div class="welcome-symbol">P</div></div>
+      <div class="stats-grid">
+        <article class="stat-card"><span class="stat-icon green">↔</span><div><p>Veículos estacionados</p><strong id="stat-abertos">—</strong></div></article>
+        <article class="stat-card"><span class="stat-icon blue">▦</span><div><p>Vagas cadastradas</p><strong id="stat-vagas">—</strong></div></article>
+        <article class="stat-card"><span class="stat-icon purple">♙</span><div><p>Usuários ativos</p><strong id="stat-usuarios">—</strong></div></article>
+        <article class="stat-card"><span class="stat-icon orange">▣</span><div><p>Veículos cadastrados</p><strong id="stat-veiculos">—</strong></div></article>
+      </div>
+      <div class="content-card"><div class="card-heading"><div><h3>Acesso rápido</h3><p>Escolha uma área para continuar.</p></div></div>
+        <div class="quick-grid">
+          <button class="quick-card" data-go="estacionamentos"><span>↔</span><strong>Entrada / saída</strong><small>Registrar permanências</small></button>
+          <button class="quick-card" data-go="clientes"><span>♧</span><strong>Clientes</strong><small>Consultar e cadastrar</small></button>
+          <button class="quick-card" data-go="veiculos"><span>▣</span><strong>Veículos</strong><small>Gerenciar veículos</small></button>
+          <button class="quick-card" data-go="vagas"><span>▦</span><strong>Vagas</strong><small>Visualizar disponibilidade</small></button>
+        </div>
+      </div>
+    </section>
 
-                    <div>
-                        <label for="cpf">CPF (11 dígitos)</label>
-                        <input id="cpf" type="text"
-                               inputmode="numeric"
-                               maxlength="11"
-                               pattern="[0-9]{11}" required>
-                    </div>
+    <section class="page" id="page-estacionamentos">
+      <div class="two-columns">
+        <div class="content-card">
+          <div class="card-heading"><div><h3>Registrar entrada</h3><p>Informe veículo, vaga, tarifa e usuário responsável.</p></div></div>
+          <form id="form-entrada" class="form-grid">
+            <label>Veículo<select id="entrada-veiculo" required><option value="">Selecione um veículo</option></select></label>
+            <label>Vaga rotativa livre<select id="entrada-vaga" required><option value="">Selecione uma vaga</option></select></label>
+            <label>Tarifa horista<select id="entrada-tarifa" required><option value="">Selecione uma tarifa</option></select></label>
+            <label>ID do usuário responsável<input id="entrada-usuario" type="number" min="1" value="1" readonly required></label>
+            <div class="form-actions"><button class="btn btn-primary" type="submit">Registrar entrada</button></div>
+          </form>
+        </div>
+        <div class="content-card info-card"><span class="big-icon">↔</span><h3>Operação de saída</h3><p>Na lista abaixo, selecione o registro aberto e confirme a saída. O backend calculará o valor, finalizará a permanência e liberará a vaga.</p><button class="btn btn-outline" id="btn-atualizar-abertos">Atualizar estacionamentos</button></div>
+      </div>
+      <div class="content-card">
+        <div class="card-heading"><div><h3>Estacionamentos abertos</h3><p>Veículos que ainda não registraram saída.</p></div><span class="pill" id="abertos-count">0 abertos</span></div>
+        <div class="table-wrap"><table><thead><tr><th>ID</th><th>Veículo</th><th>Vaga</th><th>Entrada</th><th>Tarifa</th><th>Ação</th></tr></thead><tbody id="lista-abertos"><tr><td colspan="6" class="empty">Carregando...</td></tr></tbody></table></div>
+      </div>
+    </section>
 
-                    <div>
-                        <label for="email">E-mail</label>
-                        <input id="email" type="email"
-                               maxlength="80" required>
-                    </div>
-                </div>
+    <section class="page" id="page-usuarios">
+      <div class="content-card">
+        <div class="card-heading"><div><h3 id="usuarios-form-title">Cadastrar usuário</h3><p>Usuários que operam o sistema.</p></div></div>
+        <form id="form-usuarios" class="form-grid">
+          <label>Nome<input id="u-nome" maxlength="100" required></label>
+          <label>CPF (11 dígitos)<input id="u-cpf" maxlength="11" inputmode="numeric" pattern="[0-9]{11}" required></label>
+          <label>E-mail<input id="u-email" type="email" maxlength="80" required></label>
+          <div class="form-actions"><button class="btn btn-primary" type="submit">Salvar usuário</button><button class="btn btn-outline" type="button" id="u-cancelar" hidden>Cancelar</button></div>
+        </form>
+      </div>
+      <div class="content-card"><div class="card-heading"><div><h3>Usuários cadastrados</h3><p>Edite ou desative registros existentes.</p></div><button class="btn btn-outline" data-refresh="usuarios">Atualizar</button></div><div class="table-wrap"><table><thead><tr><th>ID</th><th>Nome</th><th>CPF</th><th>E-mail</th><th>Ações</th></tr></thead><tbody id="lista-usuarios"><tr><td colspan="5" class="empty">Carregando...</td></tr></tbody></table></div></div>
+    </section>
 
-                <div class="actions">
-                    <button class="primary" type="submit">
-                        Salvar usuário
-                    </button>
+    <section class="page" id="page-clientes">
+      <div class="content-card"><div class="card-heading"><div><h3 id="clientes-form-title">Cadastrar cliente</h3><p>Cadastro de pessoas atendidas pelo estacionamento.</p></div></div>
+        <form id="form-clientes" class="form-grid">
+          <label>Nome / Razão social<input id="c-nome" maxlength="120" required></label>
+          <label>CPF / CNPJ<input id="c-documento" maxlength="18" required></label>
+          <label>Telefone<input id="c-telefone" maxlength="20"></label>
+          <label>E-mail<input id="c-email" type="email" maxlength="100"></label>
+          <label>ID usuário cadastro<input id="c-usuario" type="number" min="1" value="1" readonly required></label>
+          <div class="form-actions"><button class="btn btn-primary" type="submit">Salvar cliente</button><button class="btn btn-outline" type="button" id="c-cancelar" hidden>Cancelar</button></div>
+        </form>
+      </div>
+      <div class="content-card"><div class="card-heading"><div><h3>Clientes cadastrados</h3><p>Consulte e gerencie os clientes.</p></div><button class="btn btn-outline" data-refresh="clientes">Atualizar</button></div><div class="table-wrap"><table><thead><tr><th>ID</th><th>Nome</th><th>CPF/CNPJ</th><th>Telefone</th><th>E-mail</th><th>Ações</th></tr></thead><tbody id="lista-clientes"><tr><td colspan="6" class="empty">Carregando...</td></tr></tbody></table></div></div>
+    </section>
 
-                    <button class="secondary" type="button"
-                            id="cancelar" hidden>
-                        Cancelar edição
-                    </button>
-                </div>
-            </form>
+    <section class="page" id="page-veiculos">
+      <div class="content-card"><div class="card-heading"><div><h3 id="veiculos-form-title">Cadastrar veículo</h3><p>Cadastre carros vinculados a clientes e marcas.</p></div></div>
+        <form id="form-veiculos" class="form-grid">
+          <label>Cliente<select id="v-cliente" required><option value="">Selecione</option></select></label>
+          <label>Marca<select id="v-marca" required><option value="">Selecione</option></select></label>
+          <label>Placa<input id="v-placa" maxlength="10" required></label>
+          <label>Modelo<input id="v-modelo" maxlength="80" required></label>
+          <label>Cor<input id="v-cor" maxlength="30"></label>
+          <label>ID usuário cadastro<input id="v-usuario" type="number" min="1" value="1" readonly required></label>
+          <div class="form-actions"><button class="btn btn-primary" type="submit">Salvar veículo</button><button class="btn btn-outline" type="button" id="v-cancelar" hidden>Cancelar</button></div>
+        </form>
+      </div>
+      <div class="content-card"><div class="card-heading"><div><h3>Veículos cadastrados</h3><p>Consulte e edite os veículos.</p></div><button class="btn btn-outline" data-refresh="veiculos">Atualizar</button></div><div class="table-wrap"><table><thead><tr><th>ID</th><th>Placa</th><th>Modelo</th><th>Cliente</th><th>Marca</th><th>Ações</th></tr></thead><tbody id="lista-veiculos"><tr><td colspan="6" class="empty">Carregando...</td></tr></tbody></table></div></div>
+    </section>
 
-            <p id="mensagem" role="status"></p>
-        </section>
+    <section class="page" id="page-marcas">
+      <div class="content-card"><div class="card-heading"><div><h3 id="marcas-form-title">Cadastrar marca</h3><p>Administre as marcas disponíveis para os veículos.</p></div></div>
+        <form id="form-marcas" class="form-grid">
+          <label>Nome da marca<input id="m-nome" maxlength="50" required></label>
+          <label>ID usuário cadastro<input id="m-usuario" type="number" min="1" value="1" readonly required></label>
+          <div class="form-actions"><button class="btn btn-primary" type="submit">Salvar marca</button><button class="btn btn-outline" type="button" id="m-cancelar" hidden>Cancelar</button></div>
+        </form>
+      </div>
+      <div class="content-card"><div class="card-heading"><div><h3>Marcas cadastradas</h3><p>Lista de marcas disponíveis.</p></div><button class="btn btn-outline" data-refresh="marcas">Atualizar</button></div><div class="table-wrap"><table><thead><tr><th>ID</th><th>Marca</th><th>Ações</th></tr></thead><tbody id="lista-marcas"><tr><td colspan="3" class="empty">Carregando...</td></tr></tbody></table></div></div>
+    </section>
 
-        <section class="card">
-            <h2>Usuários cadastrados</h2>
+    <section class="page" id="page-vagas">
+      <div class="content-card"><div class="card-heading"><div><h3 id="vagas-form-title">Cadastrar vaga</h3><p>Organize vagas rotativas e de mensalistas.</p></div></div>
+        <form id="form-vagas" class="form-grid">
+          <label>Número da vaga<input id="vaga-numero" maxlength="10" required></label>
+          <label>Tipo de uso<select id="vaga-tipo-uso" required><option value="rotativa">Rotativa</option><option value="mensalista">Mensalista</option></select></label>
+          <div class="form-actions"><button class="btn btn-primary" type="submit">Salvar vaga</button><button class="btn btn-outline" type="button" id="vaga-cancelar" hidden>Cancelar</button></div>
+        </form>
+      </div>
+      <div class="content-card"><div class="card-heading"><div><h3>Mapa de vagas</h3><p>O status é atualizado pela operação de entrada e saída.</p></div><button class="btn btn-outline" data-refresh="vagas">Atualizar</button></div><div class="table-wrap"><table><thead><tr><th>ID</th><th>Número</th><th>Tipo de uso</th><th>Status</th><th>Ações</th></tr></thead><tbody id="lista-vagas"><tr><td colspan="5" class="empty">Carregando...</td></tr></tbody></table></div></div>
+    </section>
 
-            <button class="secondary" id="atualizar-lista" type="button">
-                Atualizar lista
-            </button>
+    <section class="page" id="page-tarifas">
+      <div class="content-card"><div class="card-heading"><div><h3 id="tarifas-form-title">Cadastrar tarifa</h3><p>Tarifas horistas ou mensalistas.</p></div></div>
+        <form id="form-tarifas" class="form-grid">
+          <label>Nome<input id="t-nome" maxlength="100" required></label>
+          <label>Modalidade<select id="t-modalidade" required><option value="horista">Horista</option><option value="mensalista">Mensalista</option></select></label>
+          <label>Valor (R$)<input id="t-valor" type="number" min="0" step="0.01" required></label>
+          <label>Intervalo (minutos, para horista)<input id="t-intervalo" type="number" min="1"></label>
+          <label>Início da vigência<input id="t-inicio" type="datetime-local"></label>
+          <label>Fim da vigência (opcional)<input id="t-fim" type="datetime-local"></label>
+          <div class="form-actions"><button class="btn btn-primary" type="submit">Salvar tarifa</button><button class="btn btn-outline" type="button" id="t-cancelar" hidden>Cancelar</button></div>
+        </form>
+      </div>
+      <div class="content-card"><div class="card-heading"><div><h3>Tarifas cadastradas</h3><p>Consulte valores e modalidades.</p></div><button class="btn btn-outline" data-refresh="tarifas">Atualizar</button></div><div class="table-wrap"><table><thead><tr><th>ID</th><th>Nome</th><th>Modalidade</th><th>Valor</th><th>Intervalo</th><th>Ações</th></tr></thead><tbody id="lista-tarifas"><tr><td colspan="6" class="empty">Carregando...</td></tr></tbody></table></div></div>
+    </section>
 
-            <div class="table-container">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>Nome</th>
-                            <th>CPF</th>
-                            <th>E-mail</th>
-                            <th>Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody id="lista-usuarios">
-                        <tr>
-                            <td colspan="5">Carregando usuários...</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </section>
-    </main>
+    <section class="page" id="page-contratos">
+      <div class="content-card"><div class="card-heading"><div><h3 id="contratos-form-title">Cadastrar contrato mensal</h3><p>Associe cliente, vaga e tarifa mensalista.</p></div></div>
+        <form id="form-contratos" class="form-grid">
+          <label>Cliente<select id="ct-cliente" required><option value="">Selecione</option></select></label>
+          <label>Vaga (opcional)<select id="ct-vaga"><option value="">Sem vaga definida</option></select></label>
+          <label>Tarifa mensalista<select id="ct-tarifa" required><option value="">Selecione</option></select></label>
+          <label>Data de início<input id="ct-inicio" type="date" required></label>
+          <label>Data de fim (opcional)<input id="ct-fim" type="date"></label>
+          <label>Dia de vencimento<input id="ct-vencimento" type="number" min="1" max="31" value="10" required></label>
+          <label>Valor mensal (R$)<input id="ct-valor" type="number" min="0" step="0.01" required></label>
+          <label>ID usuário cadastro<input id="ct-usuario" type="number" min="1" value="1" readonly required></label>
+          <div class="form-actions"><button class="btn btn-primary" type="submit">Salvar contrato</button><button class="btn btn-outline" type="button" id="ct-cancelar" hidden>Cancelar</button></div>
+        </form>
+      </div>
+      <div class="content-card"><div class="card-heading"><div><h3>Contratos mensais</h3><p>Contratos cadastrados no sistema.</p></div><button class="btn btn-outline" data-refresh="contratos">Atualizar</button></div><div class="table-wrap"><table><thead><tr><th>ID</th><th>Cliente</th><th>Vaga</th><th>Início</th><th>Valor mensal</th><th>Status</th><th>Ações</th></tr></thead><tbody id="lista-contratos"><tr><td colspan="7" class="empty">Carregando...</td></tr></tbody></table></div></div>
+    </section>
 
-    <script>
-        const API = "/usuarios";
-
-        const formulario = document.getElementById("form-usuario");
-        const campoNome = document.getElementById("nome");
-        const campoCpf = document.getElementById("cpf");
-        const campoEmail = document.getElementById("email");
-        const mensagem = document.getElementById("mensagem");
-        const lista = document.getElementById("lista-usuarios");
-        const cancelar = document.getElementById("cancelar");
-        const titulo = document.getElementById("titulo-formulario");
-
-        let idEmEdicao = null;
-
-        function mostrarMensagem(texto, erro = false) {
-            mensagem.textContent = texto;
-            mensagem.style.color = erro ? "#b91c1c" : "#176b45";
-        }
-
-        async function requisicao(url, opcoes = {}) {
-            const resposta = await fetch(url, {
-                ...opcoes,
-                headers: {
-                    "Content-Type": "application/json",
-                    ...(opcoes.headers || {})
-                }
-            });
-
-            if (!resposta.ok) {
-                let detalhe = "Erro ao executar a operação.";
-
-                try {
-                    const dados = await resposta.json();
-                    detalhe = typeof dados.detail === "string"
-                        ? dados.detail
-                        : JSON.stringify(dados.detail || dados);
-                } catch (_) {}
-
-                throw new Error(detalhe);
-            }
-
-            if (resposta.status === 204) {
-                return null;
-            }
-
-            return resposta.json();
-        }
-
-        async function carregarUsuarios() {
-            lista.replaceChildren();
-
-            const carregando = document.createElement("tr");
-            const celula = document.createElement("td");
-            celula.colSpan = 5;
-            celula.textContent = "Carregando...";
-            carregando.appendChild(celula);
-            lista.appendChild(carregando);
-
-            try {
-                const usuarios = await requisicao(API);
-                lista.replaceChildren();
-
-                if (usuarios.length === 0) {
-                    const linha = document.createElement("tr");
-                    const coluna = document.createElement("td");
-                    coluna.colSpan = 5;
-                    coluna.textContent = "Nenhum usuário cadastrado.";
-                    linha.appendChild(coluna);
-                    lista.appendChild(linha);
-                    return;
-                }
-
-                usuarios.forEach(usuario => {
-                    const linha = document.createElement("tr");
-
-                    [
-                        usuario.id_usuario,
-                        usuario.nome,
-                        usuario.cpf,
-                        usuario.email
-                    ].forEach(valor => {
-                        const coluna = document.createElement("td");
-                        coluna.textContent = valor ?? "";
-                        linha.appendChild(coluna);
-                    });
-
-                    const acoes = document.createElement("td");
-
-                    const botaoEditar = document.createElement("button");
-                    botaoEditar.textContent = "Editar";
-                    botaoEditar.className = "edit";
-                    botaoEditar.addEventListener("click", () => {
-                        iniciarEdicao(usuario);
-                    });
-
-                    const botaoDesativar = document.createElement("button");
-                    botaoDesativar.textContent = "Desativar";
-                    botaoDesativar.className = "deactivate";
-                    botaoDesativar.addEventListener("click", () => {
-                        desativarUsuario(usuario.id_usuario);
-                    });
-
-                    acoes.append(botaoEditar, botaoDesativar);
-                    linha.appendChild(acoes);
-                    lista.appendChild(linha);
-                });
-            } catch (erro) {
-                lista.replaceChildren();
-                const linha = document.createElement("tr");
-                const coluna = document.createElement("td");
-                coluna.colSpan = 5;
-                coluna.textContent = "Não foi possível carregar: " + erro.message;
-                linha.appendChild(coluna);
-                lista.appendChild(linha);
-            }
-        }
-
-        function iniciarEdicao(usuario) {
-            idEmEdicao = usuario.id_usuario;
-            campoNome.value = usuario.nome;
-            campoCpf.value = usuario.cpf;
-            campoEmail.value = usuario.email;
-
-            titulo.textContent = "Editar usuário #" + usuario.id_usuario;
-            cancelar.hidden = false;
-            campoNome.focus();
-            mostrarMensagem("Editando usuário #" + usuario.id_usuario);
-        }
-
-        function limparFormulario() {
-            formulario.reset();
-            idEmEdicao = null;
-            titulo.textContent = "Cadastrar usuário";
-            cancelar.hidden = true;
-        }
-
-        formulario.addEventListener("submit", async evento => {
-            evento.preventDefault();
-
-            const dados = {
-                nome: campoNome.value.trim(),
-                cpf: campoCpf.value.trim(),
-                email: campoEmail.value.trim()
-            };
-
-            try {
-                if (idEmEdicao === null) {
-                    await requisicao(API, {
-                        method: "POST",
-                        body: JSON.stringify(dados)
-                    });
-                    mostrarMensagem("Usuário cadastrado com sucesso!");
-                } else {
-                    await requisicao(`${API}/${idEmEdicao}`, {
-                        method: "PUT",
-                        body: JSON.stringify(dados)
-                    });
-                    mostrarMensagem("Usuário atualizado com sucesso!");
-                }
-
-                limparFormulario();
-                await carregarUsuarios();
-            } catch (erro) {
-                mostrarMensagem(erro.message, true);
-            }
-        });
-
-        async function desativarUsuario(id) {
-            if (!confirm("Deseja realmente desativar o usuário #" + id + "?")) {
-                return;
-            }
-
-            try {
-                await requisicao(`${API}/${id}/desativar`, {
-                    method: "PATCH"
-                });
-
-                if (idEmEdicao === id) {
-                    limparFormulario();
-                }
-
-                mostrarMensagem("Usuário desativado com sucesso!");
-                await carregarUsuarios();
-            } catch (erro) {
-                mostrarMensagem(erro.message, true);
-            }
-        }
-
-        cancelar.addEventListener("click", () => {
-            limparFormulario();
-            mostrarMensagem("Edição cancelada.");
-        });
-
-        document.getElementById("atualizar-lista")
-            .addEventListener("click", carregarUsuarios);
-
-        carregarUsuarios();
-    </script>
+    <footer>ParkControl · Sistema de Estacionamento</footer>
+  </main>
 </body>
 </html>

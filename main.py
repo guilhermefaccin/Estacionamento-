@@ -25,6 +25,7 @@ from rotas.marcas import router as marcas_router
 from rotas.tarifas import router as tarifas_router
 from rotas.contratos_mensais import router as contratos_mensais_router
 from rotas.estacionamentos import router as estacionamentos_router
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(
     title="Sistema de Estacionamento",
@@ -39,6 +40,12 @@ app.include_router(vagas_router)
 app.include_router(tarifas_router)
 app.include_router(contratos_mensais_router)
 app.include_router(estacionamentos_router)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 BASE_DIR = Path(__file__).resolve().parent
 
