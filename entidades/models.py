@@ -7,6 +7,7 @@ from sqlmodel import SQLModel, Field
 from sqlalchemy import DateTime
 from math import ceil
 
+
 class Usuario(SQLModel, table=True):
     __tablename__ = "usuarios_estacionamento"
 
@@ -31,8 +32,22 @@ class Usuario(SQLModel, table=True):
         nullable=False
     )
 
+    senha: str = Field(
+        max_length=255,
+        nullable=False
+    )
 
-    ativo: bool = Field(default=True, nullable=False)
+    perfil: str = Field(
+        default="USUARIO",
+        max_length=10,
+        nullable=False
+    )
+
+    ativo: bool = Field(
+        default=True,
+        nullable=False
+    )
+
 
 class Cliente(SQLModel, table=True):
     __tablename__ = "clientes"

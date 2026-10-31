@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
-
+from servicos.autenticacao import exigir_admin
 from banco.sessao import obter_sessao
 from schemas.marcas import MarcaCriar, MarcaAtualizar, MarcaResposta
 from servicos.marcas import (
@@ -19,6 +19,7 @@ router = APIRouter(prefix="/marcas", tags=["Marcas"])
 def criar_marca(
     dados: MarcaCriar,
     db: Session = Depends(obter_sessao),
+    usuario_logado = Depends(exigir_admin),
 ):
     try:
         return cadastrar_marca(dados, db)
@@ -61,6 +62,7 @@ def editar_marca(
     id_marca: int,
     dados: MarcaAtualizar,
     db: Session = Depends(obter_sessao),
+    usuario_logado = Depends(exigir_admin),
 ):
     try:
         marca = atualizar_marca(id_marca, dados, db)
@@ -91,6 +93,7 @@ def editar_marca(
 def desativar_marca_rota(
     id_marca: int,
     db: Session = Depends(obter_sessao),
+    usuario_logado = Depends(exigir_admin),
 ):
     try:
         marca = desativar_marca(id_marca, db)

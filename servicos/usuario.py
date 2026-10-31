@@ -1,20 +1,25 @@
 
 from sqlmodel import Session, select
+
 from entidades.models import Usuario
 from schemas.usuario import UsuarioCriar, UsuarioAtualizar
+from servicos.seguranca import gerar_hash_senha
 
 
 def cadastrar_usuario(dados: UsuarioCriar, db: Session):
-    usuario = Usuario.model_validate(dados.model_dump())
+    usuario = Usuario(
+        nome=dados.nome,
+        cpf=dados.cpf,
+        email=str(dados.email),
+        senha=gerar_hash_senha(dados.senha),
+        perfil="USUARIO"
+    )
 
     db.add(usuario)
     db.commit()
     db.refresh(usuario)
 
     return usuario
-
-from sqlmodel import select
-
 
 
 def listar_usuarios(db: Session) -> list[Usuario]:
@@ -31,9 +36,8 @@ def buscar_usuario_por_id(
         Usuario.id_usuario == id_usuario
     )
 
-    usuario = db.exec(comando).first()
+    return db.exec(comando).first()
 
-    return usuario
 
 def atualizar_usuario(
     id_usuario: int,
@@ -51,9 +55,9 @@ def atualizar_usuario(
 
     db.add(usuario)
     db.commit()
+    db.refresh(usuario)
 
     return usuario
-
 
 
 def desativar_usuario(

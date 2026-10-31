@@ -26,6 +26,14 @@ from rotas.tarifas import router as tarifas_router
 from rotas.contratos_mensais import router as contratos_mensais_router
 from rotas.estacionamentos import router as estacionamentos_router
 from fastapi.middleware.cors import CORSMiddleware
+from schemas.autenticacao import LoginRequest, LoginResposta
+from servicos.autenticacao import (
+    autenticar_usuario,
+    criar_token_acesso,
+    exigir_admin,
+)
+
+
 
 app = FastAPI(
     title="Sistema de Estacionamento",
@@ -73,6 +81,7 @@ def status():
 def criar_usuario(
     dados: UsuarioCriar,
     db: Session = Depends(obter_sessao),
+    usuario_logado: models.Usuario = Depends(exigir_admin),
 ):
     try:
         return cadastrar_usuario(dados, db)
@@ -95,6 +104,7 @@ def criar_usuario(
 @app.get("/usuarios", response_model=list[UsuarioResposta])
 def obter_usuarios(
     db: Session = Depends(obter_sessao),
+    usuario_logado: models.Usuario = Depends(exigir_admin),
 ):
     return listar_usuarios(db)
 
@@ -118,6 +128,7 @@ def editar_usuario(
     id_usuario: int,
     dados: UsuarioAtualizar,
     db: Session = Depends(obter_sessao),
+    usuario_logado: models.Usuario = Depends(exigir_admin),
 ):
     try:
         usuario = atualizar_usuario(id_usuario, dados, db)
@@ -151,6 +162,7 @@ def editar_usuario(
 def rota_desativar_usuario(
     id_usuario: int,
     db: Session = Depends(obter_sessao),
+    usuario_logado: models.Usuario = Depends(exigir_admin),
 ):
     usuario = desativar_usuario(id_usuario, db)
 
@@ -161,3 +173,28 @@ def rota_desativar_usuario(
         )
 
     return usuario
+
+@app.post("/login", response_model=LoginResposta)
+def login(
+    dados: LoginRequest,
+    db: Session = Depends(obter_sessao)
+    
+):
+    usuario = autenticar_usuario(
+        email=str(dados.email),
+        senha=dados.senha,
+        db=db
+    )
+
+    if usuario is None:
+        raise HTTPException(
+            status_code=401,
+            detail="E-mail ou senha incorretos."
+        )
+
+    token = criar_token_acesso(usuario)
+
+    return LoginResposta(
+        access_token=token,
+        token_type="bearer"
+    )

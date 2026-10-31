@@ -25,6 +25,59 @@
     </nav>
     <div class="sidebar-footer"><span class="status-dot"></span> API local <small id="api-status">verificando...</small></div>
   </aside>
+  
+<!-- TELA DE LOGIN -->
+<section id="login-screen" class="login-screen">
+  <div class="login-card">
+    <div class="login-brand">
+      <div class="login-logo">P</div>
+      <h1>ParkControl</h1>
+      <p>Sistema de gerenciamento de estacionamento</p>
+    </div>
+
+    <form id="form-login">
+      <h2>Acessar sistema</h2>
+      <p class="login-description">
+        Informe seus dados para continuar.
+      </p>
+
+      <div class="login-field">
+        <label for="login-email">E-mail</label>
+        <input
+          type="email"
+          id="login-email"
+          placeholder="Digite seu e-mail"
+          required
+          autocomplete="username"
+        >
+      </div>
+
+      <div class="login-field">
+        <label for="login-senha">Senha</label>
+        <input
+          type="password"
+          id="login-senha"
+          placeholder="Digite sua senha"
+          required
+          autocomplete="current-password"
+        >
+      </div>
+
+      <button type="submit" id="btn-login" class="btn-login">
+        Entrar no sistema
+      </button>
+
+      <p id="login-erro" class="login-error" hidden></p>
+    </form>
+
+    <div class="login-footer">
+      ParkControl &copy; 2026
+    </div>
+  </div>
+</section>
+
+<!-- PAINEL PRINCIPAL -->
+<div id="app-container" hidden>
 
   <main class="main">
     <header class="topbar">
@@ -33,7 +86,7 @@
     </header>
 
     <div id="alerta" class="alert" role="status" hidden></div>
-
+    
     <section class="page active" id="page-inicio">
       <div class="welcome"><div><p class="eyebrow light">BEM-VINDO AO PAINEL</p><h2>Controle seu estacionamento<br>em um só lugar.</h2><p>Cadastros e operação diária em uma interface única.</p></div><div class="welcome-symbol">P</div></div>
       <div class="stats-grid">

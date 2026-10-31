@@ -1,6 +1,12 @@
 
 const API_BASE = "http://127.0.0.1:8000";
 
+// Dados do usuário autenticado
+const auth = {
+  token: null,
+  usuario: null
+};
+
 const API = {
   usuarios: "/usuarios",
   clientes: "/clientes",
@@ -32,6 +38,159 @@ const titles = {
   contratos: "Contratos mensais"
 };
 
+// ========================================
+// AUTENTICAÇÃO
+// ========================================
+
+// Decodifica o conteúdo de um token JWT
+function decodificarToken(token) {
+  const partes = token.split(".");
+
+  if (partes.length !== 3) {
+    throw new Error("Token inválido.");
+  }
+
+  let base64 = partes[1]
+    .replace(/-/g, "+")
+    .replace(/_/g, "/");
+
+  base64 += "=".repeat((4 - base64.length % 4) % 4);
+
+  const binario = atob(base64);
+
+  const bytes = Uint8Array.from(
+    binario,
+    caractere => caractere.charCodeAt(0)
+  );
+
+  return JSON.parse(new TextDecoder().decode(bytes));
+}
+
+// Realiza o login no sistema
+$("form-login").addEventListener("submit", async event => {
+  event.preventDefault();
+
+  const email = $("login-email").value.trim();
+  const senha = $("login-senha").value;
+  const botao = $("btn-login");
+  const erro = $("login-erro");
+
+  erro.hidden = true;
+  botao.disabled = true;
+  botao.textContent = "Entrando...";
+
+  try {
+    const response = await fetch(`${API_BASE}/login`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ email, senha })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        typeof data.detail === "string"
+          ? data.detail
+          : "E-mail ou senha inválidos."
+      );
+    }
+
+    auth.token = data.access_token;
+
+    const payload = decodificarToken(auth.token);
+
+    if (
+      !payload.sub ||
+      !payload.perfil ||
+      !payload.exp ||
+      payload.exp * 1000 <= Date.now()
+    ) {
+      throw new Error("O servidor retornou um token inválido.");
+    }
+
+    auth.usuario = {
+      id_usuario: Number(payload.sub),
+      perfil: payload.perfil
+    };
+
+    sessionStorage.setItem("token", auth.token);
+    sessionStorage.setItem(
+      "usuario",
+      JSON.stringify(auth.usuario)
+    );
+
+    $("login-screen").hidden = true;
+    $("app-container").hidden = false;
+
+    $("form-login").reset();
+
+    showAlert("Login realizado com sucesso!");
+
+    await boot();
+
+  } catch (error) {
+    auth.token = null;
+    auth.usuario = null;
+
+    erro.textContent = error.message;
+    erro.hidden = false;
+
+  } finally {
+    botao.disabled = false;
+    botao.textContent = "Entrar no sistema";
+  }
+});
+
+// Recupera a sessão salva no navegador
+function recuperarSessao() {
+  const token = sessionStorage.getItem("token");
+  const usuario = sessionStorage.getItem("usuario");
+
+  if (!token || !usuario) {
+    return false;
+  }
+
+  try {
+    const payload = decodificarToken(token);
+
+    if (
+      !payload.sub ||
+      !payload.perfil ||
+      !payload.exp ||
+      payload.exp * 1000 <= Date.now()
+    ) {
+      throw new Error("Token expirado ou inválido.");
+    }
+
+    auth.token = token;
+    auth.usuario = {
+      id_usuario: Number(payload.sub),
+      perfil: payload.perfil
+    };
+
+    $("login-screen").hidden = true;
+    $("app-container").hidden = false;
+
+    return true;
+
+  } catch {
+    auth.token = null;
+    auth.usuario = null;
+
+    sessionStorage.removeItem("token");
+    sessionStorage.removeItem("usuario");
+
+    return false;
+  }
+}
+
+// ========================================
+// ALERTAS
+// ========================================
+
 function showAlert(message, error = false) {
   const el = $("alerta");
   el.textContent = message;
@@ -45,13 +204,24 @@ function showAlert(message, error = false) {
   }, 6500);
 }
 
+// ========================================
+// CONEXÃO COM A API
+// ========================================
+
 async function api(path, options = {}) {
+  const headers = {
+    "Content-Type": "application/json",
+    ...(options.headers || {})
+  };
+
+  // Envia o JWT automaticamente
+  if (auth.token) {
+    headers.Authorization = `Bearer ${auth.token}`;
+  }
+
   const response = await fetch(API_BASE + path, {
     ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...(options.headers || {})
-    }
+    headers
   });
 
   if (!response.ok) {
@@ -76,6 +246,10 @@ async function api(path, options = {}) {
     ? response.json()
     : null;
 }
+
+// ========================================
+// FUNÇÕES AUXILIARES
+// ========================================
 
 function esc(value) {
   return String(value ?? "").replace(/[&<>"']/g, c => ({
@@ -133,17 +307,27 @@ function actions(id, module) {
   `;
 }
 
+// ========================================
+// NAVEGAÇÃO
+// ========================================
+
 function navigate(page) {
   if (!titles[page]) return;
 
   state.page = page;
 
   document.querySelectorAll(".page").forEach(element => {
-    element.classList.toggle("active", element.id === `page-${page}`);
+    element.classList.toggle(
+      "active",
+      element.id === `page-${page}`
+    );
   });
 
   document.querySelectorAll(".nav-link").forEach(button => {
-    button.classList.toggle("active", button.dataset.page === page);
+    button.classList.toggle(
+      "active",
+      button.dataset.page === page
+    );
   });
 
   $("page-title").textContent = titles[page];
@@ -173,15 +357,21 @@ function navigate(page) {
 }
 
 document.querySelectorAll("[data-page]").forEach(button => {
-  button.addEventListener("click", () => navigate(button.dataset.page));
+  button.addEventListener("click", () => {
+    navigate(button.dataset.page);
+  });
 });
 
 document.querySelectorAll("[data-go]").forEach(button => {
-  button.addEventListener("click", () => navigate(button.dataset.go));
+  button.addEventListener("click", () => {
+    navigate(button.dataset.go);
+  });
 });
 
 document.querySelectorAll("[data-refresh]").forEach(button => {
-  button.addEventListener("click", () => loadModule(button.dataset.refresh));
+  button.addEventListener("click", () => {
+    loadModule(button.dataset.refresh);
+  });
 });
 
 $("today").textContent = new Date().toLocaleDateString("pt-BR", {
@@ -190,6 +380,10 @@ $("today").textContent = new Date().toLocaleDateString("pt-BR", {
   month: "short",
   year: "numeric"
 });
+
+// ========================================
+// CONFIGURAÇÕES DOS CADASTROS
+// ========================================
 
 const configs = {
   usuarios: {
@@ -330,7 +524,10 @@ const configs = {
         : null,
       ...(
         $("t-inicio").value
-          ? { data_inicio_vigencia: $("t-inicio").value.replace("T", " ") + ":00" }
+          ? {
+              data_inicio_vigencia:
+                $("t-inicio").value.replace("T", " ") + ":00"
+            }
           : {}
       ),
       data_fim_vigencia: $("t-fim").value
@@ -366,7 +563,9 @@ const configs = {
 
     payload: () => ({
       id_cliente: Number($("ct-cliente").value),
-      id_vaga: $("ct-vaga").value ? Number($("ct-vaga").value) : null,
+      id_vaga: $("ct-vaga").value
+        ? Number($("ct-vaga").value)
+        : null,
       id_tarifa: Number($("ct-tarifa").value),
       data_inicio: $("ct-inicio").value,
       data_fim: $("ct-fim").value || null,
@@ -387,6 +586,10 @@ const configs = {
   }
 };
 
+// ========================================
+// FORMULÁRIOS
+// ========================================
+
 function resetForm(module) {
   const config = configs[module];
   if (!config) return;
@@ -404,7 +607,8 @@ function resetForm(module) {
     clientes: "cliente"
   };
 
-  $(config.title).textContent = `Cadastrar ${names[module] || module}`;
+  $(config.title).textContent =
+    `Cadastrar ${names[module] || module}`;
 
   const cancelIds = {
     usuarios: "u-cancelar",
@@ -419,7 +623,6 @@ function resetForm(module) {
   const cancel = $(cancelIds[module]);
   if (cancel) cancel.hidden = true;
 
-  // Mantém o usuário de auditoria no ID válido.
   const userIds = {
     clientes: "c-usuario",
     veiculos: "v-usuario",
@@ -427,24 +630,54 @@ function resetForm(module) {
     contratos: "ct-usuario"
   };
 
-  if (userIds[module]) $(userIds[module]).value = "1";
+  if (userIds[module]) {
+    $(userIds[module]).value = "1";
+  }
 }
 
+// ========================================
+// TABELAS
+// ========================================
+
 function renderCell(module, key, value, row) {
-  if (key === "valor" || key === "valor_mensal") return money(value);
-  if (key === "data_inicio") return dateOnly(value);
-  if (key === "status" || key === "tipo_uso" || key === "modalidade") return badge(value);
+  if (key === "valor" || key === "valor_mensal") {
+    return money(value);
+  }
+
+  if (key === "data_inicio") {
+    return dateOnly(value);
+  }
+
+  if (
+    key === "status" ||
+    key === "tipo_uso" ||
+    key === "modalidade"
+  ) {
+    return badge(value);
+  }
 
   if (key === "id_cliente") {
-    return esc((state.data.clientes || []).find(x => x.id_cliente === value)?.nome || value || "—");
+    return esc(
+      (state.data.clientes || []).find(
+        x => x.id_cliente === value
+      )?.nome || value || "—"
+    );
   }
 
   if (key === "id_marca") {
-    return esc((state.data.marcas || []).find(x => x.id_marca === value)?.nome || value || "—");
+    return esc(
+      (state.data.marcas || []).find(
+        x => x.id_marca === value
+      )?.nome || value || "—"
+    );
   }
 
   if (key === "id_vaga") {
-    return esc((state.data.vagas || []).find(x => x.id_vaga === value)?.numero_vaga || value || "—");
+    return esc(
+      (state.data.vagas || []).find(
+        x => x.id_vaga === value
+      )?.numero_vaga || value || "—"
+    );
   }
 
   return esc(value ?? "—");
@@ -457,7 +690,13 @@ async function loadModule(module) {
   const body = $(config.list);
   if (!body) return;
 
-  body.innerHTML = `<tr><td colspan="${config.fields.length + 1}" class="empty">Carregando...</td></tr>`;
+  body.innerHTML = `
+    <tr>
+      <td colspan="${config.fields.length + 1}" class="empty">
+        Carregando...
+      </td>
+    </tr>
+  `;
 
   try {
     let data = await api(config.path);
@@ -470,7 +709,13 @@ async function loadModule(module) {
     body.innerHTML = "";
 
     if (!data.length) {
-      body.innerHTML = `<tr><td colspan="${config.fields.length + 1}" class="empty">Nenhum registro encontrado.</td></tr>`;
+      body.innerHTML = `
+        <tr>
+          <td colspan="${config.fields.length + 1}" class="empty">
+            Nenhum registro encontrado.
+          </td>
+        </tr>
+      `;
       return;
     }
 
@@ -479,19 +724,38 @@ async function loadModule(module) {
 
       config.fields.forEach(field => {
         const td = document.createElement("td");
-        td.innerHTML = renderCell(module, field, row[field], row);
+
+        td.innerHTML = renderCell(
+          module,
+          field,
+          row[field],
+          row
+        );
+
         tr.appendChild(td);
       });
 
       const td = document.createElement("td");
       td.innerHTML = actions(row[config.id], module);
+
       tr.appendChild(td);
       body.appendChild(tr);
     });
+
   } catch (error) {
-    body.innerHTML = `<tr><td colspan="${config.fields.length + 1}" class="empty">Não foi possível carregar: ${esc(error.message)}</td></tr>`;
+    body.innerHTML = `
+      <tr>
+        <td colspan="${config.fields.length + 1}" class="empty">
+          Não foi possível carregar: ${esc(error.message)}
+        </td>
+      </tr>
+    `;
   }
 }
+
+// ========================================
+// CADASTRAR E EDITAR
+// ========================================
 
 Object.entries(configs).forEach(([module, config]) => {
   const form = $(config.form);
@@ -513,7 +777,9 @@ Object.entries(configs).forEach(([module, config]) => {
           ? `${config.path}/${id}?id_usuario=${idUsuario}`
           : `${config.path}?id_usuario=${idUsuario}`;
       } else {
-        url = id ? `${config.path}/${id}` : config.path;
+        url = id
+          ? `${config.path}/${id}`
+          : config.path;
       }
 
       await api(url, {
@@ -521,13 +787,20 @@ Object.entries(configs).forEach(([module, config]) => {
         body: JSON.stringify(payload)
       });
 
-      showAlert(`${module[0].toUpperCase() + module.slice(1)} ${id ? "atualizado" : "cadastrado"} com sucesso.`);
+      showAlert(
+        `${module[0].toUpperCase() + module.slice(1)} ${
+          id ? "atualizado" : "cadastrado"
+        } com sucesso.`
+      );
 
       resetForm(module);
       await loadModule(module);
       await loadSelects();
 
-      if (module === "estacionamentos") await loadParking();
+      if (module === "estacionamentos") {
+        await loadParking();
+      }
+
     } catch (error) {
       showAlert(error.message, true);
     }
@@ -544,8 +817,17 @@ Object.entries(configs).forEach(([module, config]) => {
   };
 
   const cancel = $(cancelIds[module]);
-  if (cancel) cancel.addEventListener("click", () => resetForm(module));
+
+  if (cancel) {
+    cancel.addEventListener("click", () => {
+      resetForm(module);
+    });
+  }
 });
+
+// ========================================
+// EDITAR E DESATIVAR REGISTROS
+// ========================================
 
 document.addEventListener("click", async event => {
   const edit = event.target.closest("[data-edit]");
@@ -562,9 +844,11 @@ document.addEventListener("click", async event => {
     if (!row) return;
 
     state.editing[module] = row[config.id];
+
     config.makeEdit(row);
 
-    $(config.title).textContent = `Editar registro #${row[config.id]}`;
+    $(config.title).textContent =
+      `Editar registro #${row[config.id]}`;
 
     const cancelIds = {
       usuarios: "u-cancelar",
@@ -577,9 +861,13 @@ document.addEventListener("click", async event => {
     };
 
     const cancel = $(cancelIds[module]);
+
     if (cancel) cancel.hidden = false;
 
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth"
+    });
   }
 
   if (disable) {
@@ -588,9 +876,15 @@ document.addEventListener("click", async event => {
 
     if (!config) return;
 
-    const action = module === "contratos" ? "encerrar" : "desativar";
+    const action = module === "contratos"
+      ? "encerrar"
+      : "desativar";
 
-    if (!confirm(`Deseja ${action === "encerrar" ? "encerrar" : "desativar"} o registro #${disable.dataset.id}?`)) {
+    if (
+      !confirm(
+        `Deseja ${action === "encerrar" ? "encerrar" : "desativar"} o registro #${disable.dataset.id}?`
+      )
+    ) {
       return;
     }
 
@@ -613,11 +907,19 @@ document.addEventListener("click", async event => {
 
       await loadModule(module);
       await loadSelects();
+
     } catch (error) {
-      showAlert(`Não foi possível concluir a operação: ${error.message}`, true);
+      showAlert(
+        `Não foi possível concluir a operação: ${error.message}`,
+        true
+      );
     }
   }
 });
+
+// ========================================
+// LISTAS DE SELEÇÃO
+// ========================================
 
 async function loadSelect(id, path, labelFn, placeholder = "Selecione") {
   const element = $(id);
@@ -643,25 +945,75 @@ async function loadSelect(id, path, labelFn, placeholder = "Selecione") {
           row.id_tarifa ??
           row.id_contrato;
 
-        return `<option value="${esc(idValue)}">${esc(labelFn(row))}</option>`;
+        return `
+          <option value="${esc(idValue)}">
+            ${esc(labelFn(row))}
+          </option>
+        `;
       }).join("");
 
-    if (previous) element.value = previous;
+    if (previous) {
+      element.value = previous;
+    }
+
   } catch {
-    element.innerHTML = `<option value="">Não foi possível carregar</option>`;
+    element.innerHTML = `
+      <option value="">Não foi possível carregar</option>
+    `;
   }
 }
 
 async function loadSelects() {
   await Promise.all([
-    loadSelect("entrada-veiculo", API.veiculos, row => `${row.placa} — ${row.modelo}`),
-    loadSelect("entrada-vaga", API.vagas, row => `${row.numero_vaga} (${row.status})`, "Selecione uma vaga"),
-    loadSelect("entrada-tarifa", API.tarifas, row => `${row.nome} — ${money(row.valor)}`),
-    loadSelect("v-cliente", API.clientes, row => row.nome),
-    loadSelect("v-marca", API.marcas, row => row.nome),
-    loadSelect("ct-cliente", API.clientes, row => row.nome),
-    loadSelect("ct-vaga", API.vagas, row => row.numero_vaga, "Sem vaga definida"),
-    loadSelect("ct-tarifa", API.tarifas, row => `${row.nome} — ${money(row.valor)}`)
+    loadSelect(
+      "entrada-veiculo",
+      API.veiculos,
+      row => `${row.placa} — ${row.modelo}`
+    ),
+
+    loadSelect(
+      "entrada-vaga",
+      API.vagas,
+      row => `${row.numero_vaga} (${row.status})`,
+      "Selecione uma vaga"
+    ),
+
+    loadSelect(
+      "entrada-tarifa",
+      API.tarifas,
+      row => `${row.nome} — ${money(row.valor)}`
+    ),
+
+    loadSelect(
+      "v-cliente",
+      API.clientes,
+      row => row.nome
+    ),
+
+    loadSelect(
+      "v-marca",
+      API.marcas,
+      row => row.nome
+    ),
+
+    loadSelect(
+      "ct-cliente",
+      API.clientes,
+      row => row.nome
+    ),
+
+    loadSelect(
+      "ct-vaga",
+      API.vagas,
+      row => row.numero_vaga,
+      "Sem vaga definida"
+    ),
+
+    loadSelect(
+      "ct-tarifa",
+      API.tarifas,
+      row => `${row.nome} — ${money(row.valor)}`
+    )
   ]);
 
   const vaga = $("entrada-vaga");
@@ -674,7 +1026,14 @@ async function loadSelects() {
         item => String(item.id_vaga) === option.value
       );
 
-      if (row && (row.status !== "livre" || row.tipo_uso !== "rotativa" || row.ativo === false)) {
+      if (
+        row &&
+        (
+          row.status !== "livre" ||
+          row.tipo_uso !== "rotativa" ||
+          row.ativo === false
+        )
+      ) {
         option.remove();
       }
     });
@@ -690,12 +1049,22 @@ async function loadSelects() {
         item => String(item.id_tarifa) === option.value
       );
 
-      if (row && (row.modalidade !== "horista" || row.ativo === false)) {
+      if (
+        row &&
+        (
+          row.modalidade !== "horista" ||
+          row.ativo === false
+        )
+      ) {
         option.remove();
       }
     });
   }
 }
+
+// ========================================
+// REGISTRAR ENTRADA
+// ========================================
 
 $("form-entrada").addEventListener("submit", async event => {
   event.preventDefault();
@@ -723,18 +1092,30 @@ $("form-entrada").addEventListener("submit", async event => {
     await loadParking();
     await loadSelects();
     await loadModule("vagas");
+
   } catch (error) {
     showAlert(error.message, true);
   }
 });
 
-$("btn-atualizar-abertos").addEventListener("click", loadParking);
+$("btn-atualizar-abertos").addEventListener(
+  "click",
+  loadParking
+);
+
+// ========================================
+// ESTACIONAMENTOS ABERTOS
+// ========================================
 
 async function loadParking() {
   const body = $("lista-abertos");
   if (!body) return;
 
-  body.innerHTML = '<tr><td colspan="6" class="empty">Carregando...</td></tr>';
+  body.innerHTML = `
+    <tr>
+      <td colspan="6" class="empty">Carregando...</td>
+    </tr>
+  `;
 
   try {
     let rows = await api(`${API.estacionamentos}/abertos`);
@@ -749,7 +1130,13 @@ async function loadParking() {
     body.innerHTML = "";
 
     if (!rows.length) {
-      body.innerHTML = '<tr><td colspan="6" class="empty">Nenhum estacionamento aberto.</td></tr>';
+      body.innerHTML = `
+        <tr>
+          <td colspan="6" class="empty">
+            Nenhum estacionamento aberto.
+          </td>
+        </tr>
+      `;
       return;
     }
 
@@ -770,7 +1157,9 @@ async function loadParking() {
 
       [
         row.id_estacionamento,
-        vehicle ? `${vehicle.placa} — ${vehicle.modelo}` : `Veículo #${row.id_veiculo}`,
+        vehicle
+          ? `${vehicle.placa} — ${vehicle.modelo}`
+          : `Veículo #${row.id_veiculo}`,
         space?.numero_vaga || `Vaga #${row.id_vaga}`,
         dateTime(row.data_hora_entrada),
         tariff?.nome || `Tarifa #${row.id_tarifa || "—"}`
@@ -787,7 +1176,11 @@ async function loadParking() {
       button.textContent = "Registrar saída";
 
       button.addEventListener("click", async () => {
-        if (!confirm(`Registrar saída do estacionamento #${row.id_estacionamento}?`)) {
+        if (
+          !confirm(
+            `Registrar saída do estacionamento #${row.id_estacionamento}?`
+          )
+        ) {
           return;
         }
 
@@ -797,11 +1190,14 @@ async function loadParking() {
             { method: "PATCH" }
           );
 
-          showAlert(`Saída registrada. Valor calculado: ${money(result.valor_calculado)}.`);
+          showAlert(
+            `Saída registrada. Valor calculado: ${money(result.valor_calculado)}.`
+          );
 
           await loadParking();
           await loadSelects();
           await loadModule("vagas");
+
         } catch (error) {
           showAlert(error.message, true);
         }
@@ -811,16 +1207,32 @@ async function loadParking() {
       tr.appendChild(td);
       body.appendChild(tr);
     });
+
   } catch (error) {
-    body.innerHTML = `<tr><td colspan="6" class="empty">Não foi possível carregar estacionamentos: ${esc(error.message)}</td></tr>`;
+    body.innerHTML = `
+      <tr>
+        <td colspan="6" class="empty">
+          Não foi possível carregar estacionamentos:
+          ${esc(error.message)}
+        </td>
+      </tr>
+    `;
   }
 }
+
+// ========================================
+// PAINEL PRINCIPAL
+// ========================================
 
 async function loadDashboard() {
   const read = async path => {
     try {
       const data = await api(path);
-      return Array.isArray(data) ? data.length : 0;
+
+      return Array.isArray(data)
+        ? data.length
+        : 0;
+
     } catch {
       return "—";
     }
@@ -839,31 +1251,60 @@ async function loadDashboard() {
   $("stat-veiculos").textContent = vehicles;
 
   try {
-    const [vehiclesData, spacesData, tariffsData, contractsData, clientsData] =
-      await Promise.all([
-        api(API.veiculos),
-        api(API.vagas),
-        api(API.tarifas),
-        api(API.contratos),
-        api(API.clientes)
-      ]);
+    const [
+      vehiclesData,
+      spacesData,
+      tariffsData,
+      contractsData,
+      clientsData
+    ] = await Promise.all([
+      api(API.veiculos),
+      api(API.vagas),
+      api(API.tarifas),
+      api(API.contratos),
+      api(API.clientes)
+    ]);
 
-    state.data.veiculos = Array.isArray(vehiclesData) ? vehiclesData : [];
-    state.data.vagas = Array.isArray(spacesData) ? spacesData : [];
-    state.data.tarifas = Array.isArray(tariffsData) ? tariffsData : [];
-    state.data.contratos = Array.isArray(contractsData) ? contractsData : [];
-    state.data.clientes = Array.isArray(clientsData) ? clientsData : [];
+    state.data.veiculos = Array.isArray(vehiclesData)
+      ? vehiclesData
+      : [];
+
+    state.data.vagas = Array.isArray(spacesData)
+      ? spacesData
+      : [];
+
+    state.data.tarifas = Array.isArray(tariffsData)
+      ? tariffsData
+      : [];
+
+    state.data.contratos = Array.isArray(contractsData)
+      ? contractsData
+      : [];
+
+    state.data.clientes = Array.isArray(clientsData)
+      ? clientsData
+      : [];
+
   } catch {}
 }
+
+// ========================================
+// STATUS DA API
+// ========================================
 
 async function checkApi() {
   try {
     await api("/status");
     $("api-status").textContent = "online";
+
   } catch {
     $("api-status").textContent = "API configurada";
   }
 }
+
+// ========================================
+// INICIALIZAÇÃO
+// ========================================
 
 async function boot() {
   await checkApi();
@@ -872,4 +1313,11 @@ async function boot() {
   await loadModule("usuarios");
 }
 
-boot();
+// Só abre o painel quando existir uma sessão válida
+if (recuperarSessao()) {
+  boot();
+
+} else {
+  $("login-screen").hidden = false;
+  $("app-container").hidden = true;
+}
